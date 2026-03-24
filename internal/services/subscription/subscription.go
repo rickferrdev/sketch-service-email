@@ -39,7 +39,7 @@ func (se *Service) Signature(ctx context.Context, email string) error {
 		Body:    body,
 	}
 
-	if err := se.mail.Send(ctx, payload); err != nil {
+	if err := se.mail.Process(payload); err != nil {
 		slog.Error("mail delivery failed",
 			slog.String("email", email),
 			slog.Any("error", err),

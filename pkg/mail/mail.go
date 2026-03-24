@@ -1,7 +1,6 @@
 package mail
 
 import (
-	"context"
 	"log/slog"
 	"strconv"
 
@@ -11,6 +10,7 @@ import (
 
 type Mail struct {
 	dialer *gomail.Dialer
+	jobs   chan Message
 }
 
 type Message struct {
@@ -20,6 +20,8 @@ type Message struct {
 }
 
 func New(env *env.Environment) (*Mail, error) {
+	jobs := make(chan Message, 100)
+
 	port, err := strconv.Atoi(env.MAIL_PORT)
 	if err != nil {
 		slog.Error("failed to parse mail port",
@@ -44,10 +46,30 @@ func New(env *env.Environment) (*Mail, error) {
 
 	slog.Info("SMTP connection established successfully", slog.String("host", env.MAIL_HOST))
 
-	return &Mail{dialer: dialer}, nil
+	m := Mail{dialer: dialer, jobs: jobs}
+
+	go m.worker()
+
+	return &m, nil
 }
 
-func (ma *Mail) Send(ctx context.Context, payload Message) error {
+func (ma *Mail) worker() {
+	for message := range ma.jobs {
+		slog.Debug("processing email sent", slog.String("to", message.To))
+		if err := ma.Send(message); err != nil {
+			slog.Error("email processing failed", slog.Any("error", err), slog.String("to", message.To))
+		}
+		slog.Info("email processed successfully in the background", slog.String("to", message.To))
+	}
+}
+
+func (ma *Mail) Process(payload Message) error {
+	ma.jobs <- payload
+	slog.Debug("message added to queue", slog.String("to", payload.To))
+	return nil
+}
+
+func (ma *Mail) Send(payload Message) error {
 	mail := gomail.NewMessage()
 	mail.SetHeader("From", "sketch-service-email@demomailtrap.co")
 	mail.SetHeader("To", payload.To)
