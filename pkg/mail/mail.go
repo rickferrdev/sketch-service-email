@@ -33,17 +33,6 @@ func New(env *env.Environment) (*Mail, error) {
 
 	dialer := gomail.NewDialer(env.MAIL_HOST, port, env.MAIL_USER, env.MAIL_PASS)
 
-	closer, err := dialer.Dial()
-	if err != nil {
-		slog.Error("failed to establish SMTP connection",
-			slog.String("host", env.MAIL_HOST),
-			slog.Int("port", port),
-			slog.Any("error", err),
-		)
-		return nil, err
-	}
-	defer closer.Close()
-
 	slog.Info("SMTP connection established successfully", slog.String("host", env.MAIL_HOST))
 
 	m := Mail{dialer: dialer, jobs: jobs}
